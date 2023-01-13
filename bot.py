@@ -3,6 +3,7 @@ import discord
 from dotenv import load_dotenv
 import yfinance as yf
 from discord.ext import commands
+import sqlite3
 
 # load secrets
 load_dotenv()
