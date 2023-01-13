@@ -4,18 +4,15 @@ from dotenv import load_dotenv
 import yfinance as yf
 from discord.ext import commands
 
+# load secrets
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_GUILD')
 
-
+# init
 intents = discord.Intents.default()
 intents.message_content = True
-
-# bot = discord.Client(intents=intents)
 bot = commands.Bot(command_prefix='$', intents=intents)
-
-
 
 @bot.event
 async def on_ready():
@@ -45,11 +42,52 @@ async def some_crazy_function_name(ctx):
 async def ticker(ctx, *symbols):
     for symbol in symbols:
 
-        tickerData = yf.Ticker(symbol)
-        todayData = tickerData.history(period='1d')
-        last_close = str(round(todayData['Close'][0], 2)) 
-        # stock = yf.Ticker(symbol).info
-        await ctx.send(f'{symbol} last close price : ${last_close}')
+        try:
+            tickerData = yf.Ticker(symbol)
+            todayData = tickerData.history(period='1d')
+            last_close = str(round(todayData['Close'][0], 2)) 
+            await ctx.send(f'{symbol} last close price : ${last_close}')
+        except Exception as e:
+            await ctx.send('try a real ticker dumbass')
+
+@bot.command(name="timer")
+async def timer(ctx, timeInput):
+    try:
+        try:
+            time = int(timeInput)
+        except:
+            convertTimeList = {'s':1, 'm':60, 'h':3600, 'd':86400, 'S':1, 'M':60, 'H':3600, 'D':86400}
+            time = int(timeInput[:-1]) * convertTimeList[timeInput[-1]]
+        if time > 86400:
+            await ctx.send("I can\'t do timers over a day long")
+            return
+        if time <= 0:
+            await ctx.send("Timers don\'t go into negatives :/")
+            return
+        if time >= 3600:
+            message = await ctx.send(f"Timer: {time//3600} hours {time%3600//60} minutes {time%60} seconds")
+        elif time >= 60:
+            message = await ctx.send(f"Timer: {time//60} minutes {time%60} seconds")
+        elif time < 60:
+            message = await ctx.send(f"Timer: {time} seconds")
+        while True:
+            try:
+                await time.sleep(5)
+                time -= 5
+                if time >= 3600:
+                    await message.edit(content=f"Timer: {time//3600} hours {time %3600//60} minutes {time%60} seconds")
+                elif time >= 60:
+                    await message.edit(content=f"Timer: {time//60} minutes {time%60} seconds")
+                elif time < 60:
+                    await message.edit(content=f"Timer: {time} seconds")
+                if time <= 0:
+                    await message.edit(content="Ended!")
+                    await ctx.send(f"{ctx.author.mention} Your countdown Has ended!")
+                    break
+            except:
+                break
+    except:
+        await ctx.send('enter time in seconds')
 
 
 bot.run(TOKEN)
