@@ -1,25 +1,26 @@
-version '3.8'
+version: '3.9'
 
 services:
+
   web:
-    build: ./project
+    build: ./app
     ports:
       - 8004:8000
     command: uvicorn main:app --host 0.0.0.0 --reload
-    volume:
-      - ./project:/usr/src/app
-    enviornment:
+    volumes:
+      - ./app:/usr/src/app
+    environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       - redis
 
   worker:
-    build: ./project
-    command: celery worker --app=worker.celer --loglevel=info
+    build: ./app
+    command: celery -A worker.celery worker --loglevel=info --logfile=celery.log
     volumes:
-      - ./project:/usr/src/app
-    enviornment:
+      - ./app:/usr/src/app
+    environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
