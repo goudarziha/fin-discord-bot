@@ -1,0 +1,6 @@
+discord.py==2.1.0
+fastapi==0.89.1
+numpy==1.21.5
+python-dotenv==0.21.0
+selenium==4.7.2
+yfinance==0.2.3
