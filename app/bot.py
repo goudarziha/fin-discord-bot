@@ -3,7 +3,11 @@ import discord
 from dotenv import load_dotenv
 import yfinance as yf
 from discord.ext import commands
+import datetime
+import pandas as pd
 import sqlite3
+
+from table2ascii import table2ascii as t2a, PresetStyle
 
 # load secrets
 load_dotenv()
@@ -14,6 +18,8 @@ GUILD = os.getenv('DISCORD_GUILD')
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='$', intents=intents)
+
+# TODO: CREATE BOT CLASS
 
 @bot.event
 async def on_ready():
@@ -35,9 +41,14 @@ async def on_member_join(member):
         f'Hi {member.name}, welcome to the OG Pirate Chat!'
     )
 
+# SAMPLE COMMAND
 @bot.command(name="ping")
 async def some_crazy_function_name(ctx):
 	await ctx.channel.send("pong")
+
+# TODO: move to util
+def clean_up_single_field(field: float, round_field: int = 2) -> float:
+    return round((field[0]), round_field)
 
 @bot.command(name='ticker', help='Lookup Ticker info')
 async def ticker(ctx, *symbols):
@@ -46,10 +57,77 @@ async def ticker(ctx, *symbols):
         try:
             tickerData = yf.Ticker(symbol)
             todayData = tickerData.history(period='1d')
-            last_close = str(round(todayData['Close'][0], 2)) 
-            await ctx.send(f'{symbol} last close price : ${last_close}')
+
+            o = clean_up_single_field(todayData['Open'])
+            h = clean_up_single_field(todayData['High'])
+            l = clean_up_single_field(todayData['Low'])
+            c = clean_up_single_field(todayData['Close'])
+
+            output = t2a(
+                header=["Instrument", "Current", "Open", "High", "Low", "Close"],
+                body=[[symbol, c, o, h, l, c]],
+                first_col_heading=True
+            )
+
+            await ctx.send(f"```\n{output}\n```")
         except Exception as e:
             await ctx.send('try a real ticker dumbass')
+
+
+@bot.command(name='opx', help="Options Chain")
+async def opx(ctx, symbol: str, expiration_date: str = None) -> None:
+    limit=2
+    tk = yf.Ticker(symbol)
+    exp = list(tk.options)
+
+    if expiration_date == None:
+        try:
+            await ctx.send(f'Please select a exp date \n {exp}')
+            return
+        except:
+            await ctx.send('error?')
+            return
+
+    try:
+        opt = tk.option_chain(expiration_date)
+        todayData = tk.history(period='1d')
+        current = clean_up_single_field(todayData['Close'])
+
+        # get closet strike to current close
+        closest_strike_calls = opt.calls.iloc[(opt.calls['strike']-round(current)).abs().argsort()[:1]].index.values.astype(int)[0]
+        limited_calls = opt.calls.iloc[closest_strike_calls-limit:closest_strike_calls+limit]
+
+        closest_strike_puts = opt.puts.iloc[(opt.puts['strike']-round(current)).abs().argsort()[:1]].index.values.astype(int)[0]
+        limited_puts = opt.puts.iloc[closest_strike_puts-limit:closest_strike_puts+limit]
+
+        options = pd.concat([limited_calls, limited_puts])
+
+        # change above back to opt if you want to add epx dat
+
+        # opt['expirationDate'] = expiration_date
+        # options = pd.concat([opt], ignore_index=True)
+        
+        # yfinance returns incorrect date, add 1 day for correct exp
+        # options['expirationDate'] = pd.to_datetime(options['expirationDate']) + datetime.timedelta(days=1)
+
+        # options['dte'] = (options['expirationDate'] - datetime.datetime.today()).dt.days / 365
+        options['CALL'] = options['contractSymbol'].str[4:].apply(lambda x: "C" in x)
+        options[['bid', 'ask', 'strike']] = options[['bid', 'ask', 'strike']].apply(pd.to_numeric)
+
+        # mid-point
+        options['mark'] = (options['bid'] + options['ask']) / 2 
+        
+        # Drop unnecessary and meaningless columns
+        options = options.drop(columns = ['contractSize', 'currency', 'change', 'lastTradeDate', 'lastPrice'])
+
+        print(options.to_markdown(index=False))
+
+        await ctx.send(f'{options.to_markdown(index=False)}')
+    except Exception as e: 
+        await ctx.send(f'Error: {str(e)}')
+        
+
+
 
 @bot.command(name="timer")
 async def timer(ctx, timeInput):
