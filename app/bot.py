@@ -20,6 +20,13 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='$', intents=intents)
 
 # TODO: CREATE BOT CLASS
+# class DiscordBot(commands.bot):
+#     def __init__(self):
+#         super().__init__(command_prefix="$")
+
+#         @self.command(name='test')
+#         async def custom(ctx):
+#             print('hello world')
 
 @bot.event
 async def on_ready():
@@ -41,6 +48,9 @@ async def on_member_join(member):
         f'Hi {member.name}, welcome to the OG Pirate Chat!'
     )
 
+@bot.command(name="help")
+async def help(ctx)
+
 # SAMPLE COMMAND
 @bot.command(name="ping")
 async def some_crazy_function_name(ctx):
@@ -55,22 +65,33 @@ async def ticker(ctx, *symbols):
     for symbol in symbols:
 
         try:
-            tickerData = yf.Ticker(symbol)
-            todayData = tickerData.history(period='1d')
+            tk = yf.Ticker(symbol)
+            
+            prev_close = tk.info['regularMarketPreviousClose']
+            current = tk.info['regularMarketPrice']
+            # o = tk['regularMarketOpen']
+            # h = tk['regularMarketDayHigh']
+            # l = tk['regularMarketDayLow']
+            # c = tk['regularMarketClose']
+            vol = tk.info['regularMarketVolume']
+            todayData = tk.history(period='1d')
 
             o = clean_up_single_field(todayData['Open'])
             h = clean_up_single_field(todayData['High'])
             l = clean_up_single_field(todayData['Low'])
             c = clean_up_single_field(todayData['Close'])
 
+            change = round(((current - prev_close) * 100 / prev_close), 2)
+
             output = t2a(
-                header=["Instrument", "Current", "Open", "High", "Low", "Close"],
-                body=[[symbol, c, o, h, l, c]],
+                header=["Instrument", "Current", "Open", "High", "Low", "Close", "Vol", "% Change"],
+                body=[[symbol, current, o, h, l, c, vol, change]],
                 first_col_heading=True
             )
 
             await ctx.send(f"```\n{output}\n```")
         except Exception as e:
+            print(str(e))
             await ctx.send('try a real ticker dumbass')
 
 
